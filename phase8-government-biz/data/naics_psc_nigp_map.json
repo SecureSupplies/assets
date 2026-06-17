@@ -1,0 +1,38 @@
+{
+  "NAICS": {
+    "424710": "Petroleum Bulk Stations and Terminals",
+    "424720": "Petroleum and Petroleum Products Merchant Wholesalers",
+    "324110": "Petroleum Refineries",
+    "325120": "Industrial Gas Manufacturing",
+    "325311": "Nitrogenous Fertilizer Manufacturing",
+    "325312": "Phosphatic Fertilizer Manufacturing",
+    "325314": "Fertilizer Mixing",
+    "325998": "Other Miscellaneous Chemical Product Manufacturing",
+    "562998": "Other Miscellaneous Waste Management Services",
+    "493190": "Other Warehousing and Storage",
+    "532490": "Other Commercial and Industrial Machinery and Equipment Rental and Leasing"
+  },
+  "PSC_FSC": {
+    "9130": "Liquid propellants and fuels including aviation gasoline, jet fuels, gasoline",
+    "9140": "Fuel oils including diesel fuels, kerosene, burner fuels, heavy fuel, bunker fuel",
+    "6830": "Gases, compressed and liquefied",
+    "6810": "Chemicals",
+    "6840": "Pest control agents / disinfectants",
+    "6850": "Miscellaneous chemical specialties",
+    "5430": "Storage tanks",
+    "4930": "Lubrication and fuel dispensing equipment",
+    "4320": "Power and hand pumps",
+    "6115": "Generators and generator sets"
+  },
+  "NIGP": {
+    "405": "Fuels, oils, lubricants",
+    "430": "Gases, containers, and gas equipment",
+    "335": "Fertilizers",
+    "885": "Water and wastewater treating chemicals",
+    "545": "Machinery and hardware, industrial",
+    "578": "Miscellaneous equipment",
+    "830": "Tanks",
+    "936": "Equipment maintenance and repair",
+    "962": "Miscellaneous services"
+  }
+}
