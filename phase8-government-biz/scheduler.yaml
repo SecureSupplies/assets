@@ -1,0 +1,23 @@
+version: 1
+name: phase8-government-biz
+jobs:
+  sam_urgent_hourly:
+    command: python run_pipeline.py --mode production --limit-per-source 100
+    schedule: "0 * * * *"
+    sources: ["SAM.gov Contract Opportunities"]
+    route: "GOV FAST PURCHASE POSTS"
+  daily_full_sync:
+    command: python run_pipeline.py --mode production --limit-per-source 250
+    schedule: "20 6 * * *"
+    sources: ["SAM.gov", "USAspending", "GSA Auctions", "EIA", "OpenFEMA", "NWS", "State/Territory Procurement Registry"]
+  weather_disaster_two_hour:
+    command: python run_pipeline.py --mode production --limit-per-source 100
+    schedule: "15 */2 * * *"
+    sources: ["NWS", "OpenFEMA", "NHC RSS"]
+  dry_run_validation:
+    command: python run_pipeline.py --mode test --include-samples
+    schedule: "manual"
+notifications:
+  high_value_to: fuels@securesupplies.us
+  min_fast_score: 70
+  min_priority_score: 80
