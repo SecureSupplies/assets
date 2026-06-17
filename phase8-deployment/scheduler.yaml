@@ -1,0 +1,32 @@
+# Sample scheduler for Phase 8 Government Biz
+#
+# This file defines cron‑style schedules for various ingestion jobs.  You can
+# deploy it with cron, Airflow or any task orchestrator that can execute
+# Python scripts on a schedule.  Adjust times to suit your operational
+# requirements and API rate limits.
+
+jobs:
+  # Hourly pull from SAM.gov Contract Opportunities API
+  - name: sam_contract_opportunities
+    schedule: "0 * * * *"
+    command: "python scripts/test_mode.py --source sam --limit 100"
+
+  # Daily pull from USAspending award search API
+  - name: usa_awards
+    schedule: "30 2 * * *"
+    command: "python scripts/test_mode.py --source usaspending --limit 500"
+
+  # Twice daily pull from GSA Auctions
+  - name: gsa_auctions
+    schedule: "0 6,18 * * *"
+    command: "python scripts/test_mode.py --source gsa --limit 200"
+
+  # Daily price intel update from EIA
+  - name: eia_prices
+    schedule: "15 3 * * *"
+    command: "python scripts/test_mode.py --source eia --limit 0"
+
+  # Weekly state/local CSV import
+  - name: state_local_csv
+    schedule: "0 4 * * 1"
+    command: "python scripts/test_mode.py --source state_csv --limit 0"
