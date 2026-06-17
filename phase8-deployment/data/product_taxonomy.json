@@ -1,0 +1,36 @@
+{
+  "categories": [
+    {
+      "id": "fuels",
+      "name": "Fuels",
+      "children": [
+        {"id": "diesel", "name": "Diesel"},
+        {"id": "def", "name": "Diesel Exhaust Fluid"},
+        {"id": "lng", "name": "Liquefied Natural Gas"},
+        {"id": "cng", "name": "Compressed Natural Gas"},
+        {"id": "propane", "name": "Propane"},
+        {"id": "jet", "name": "Jet Fuel"},
+        {"id": "marine", "name": "Marine Fuel"}
+      ]
+    },
+    {
+      "id": "industrial_gases",
+      "name": "Industrial Gases",
+      "children": [
+        {"id": "hydrogen", "name": "Hydrogen"},
+        {"id": "oxygen", "name": "Oxygen"},
+        {"id": "nitrogen", "name": "Nitrogen"},
+        {"id": "co2", "name": "Carbon Dioxide"}
+      ]
+    },
+    {
+      "id": "chemicals",
+      "name": "Chemicals",
+      "children": [
+        {"id": "fertilizers", "name": "Fertilizers"},
+        {"id": "water_wastewater", "name": "Water & Wastewater Treatment Chemicals"},
+        {"id": "emergency", "name": "Emergency Response Chemicals"}
+      ]
+    }
+  ]
+}
