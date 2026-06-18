@@ -21,3 +21,14 @@ jobs:
           ZOHO_CLIENT_SECRET: ${{ secrets.ZOHO_CLIENT_SECRET }}
           ZOHO_REFRESH_TOKEN: ${{ secrets.ZOHO_REFRESH_TOKEN }}
         run: python enrich_crm_script.py --mode apply --max-updates 100
+      - name: Upload FACTURA audit package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factura-vendor-enrichment-audit
+          path: |
+            factura_enrichment_report.json
+            factura_enrichment_audit.jsonl
+            factura_zoho_schema.json
+          if-no-files-found: warn
+          retention-days: 30
