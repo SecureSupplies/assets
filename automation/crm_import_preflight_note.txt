@@ -1,0 +1,1 @@
+This branch is used for an authorized Zoho CRM import preflight. No lead data or credentials are stored in this file.
