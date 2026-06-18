@@ -1,4 +1,4 @@
-name: Enrich CRM Data
+name: Secure Zoho CRM Import
 
 on:
   workflow_dispatch:
@@ -12,25 +12,24 @@ permissions:
   contents: write
 
 jobs:
-  enrich:
+  execute:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - name: Install dependencies
-        run: pip install requests beautifulsoup4
-      - name: Enrich CRM
+        run: pip install requests pynacl
+      - name: Run secured Zoho operation
         env:
           ZOHO_ACCESS_TOKEN: ${{ secrets.ZOHO_ACCESS_TOKEN }}
         run: python enrich_crm_script.py
-      - name: Record result
+      - name: Record non-secret result
         if: always()
         run: |
           git config user.name "secure-supplies-crm-bot"
           git config user.email "procurement@securesupplies.us"
-          git add zoho_*_result.json zoho_*_audit.csv 2>/dev/null || true
-          git commit -m "Record authorized Zoho CRM execution result" || true
+          git add zoho_preflight_result.json zoho_import_result.json zoho_import_public.key zoho_import_audit.enc 2>/dev/null || true
+          git commit -m "Record secured Zoho CRM execution result" || true
           git push origin HEAD:${GITHUB_REF_NAME}
