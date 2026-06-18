@@ -2,6 +2,11 @@ name: Enrich CRM Data
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - crm-import-secure-20260618
+    paths:
+      - automation/execute-import.marker
 
 jobs:
   enrich:
