@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - crm-import-secure-20260618
-    paths:
-      - automation/execute-import.marker
 
 permissions:
   contents: write
