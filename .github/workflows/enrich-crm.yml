@@ -17,4 +17,4 @@ jobs:
       - name: Enrich CRM
         env:
           ZOHO_ACCESS_TOKEN: ${{ secrets.ZOHO_ACCESS_TOKEN }}
-        run: python enrich_crm_script.py
+        run: python enrich_crm_script.py --mode apply --max-updates 100
