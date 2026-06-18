@@ -1,313 +1,218 @@
-"""
-Automated CRM enrichment script for Secure Supplies.
-
-This script iterates through Leads, Accounts, and Contacts modules in a Zoho CRM
-and enriches each record by gathering information from public web sources. It
-then updates the CRM with verified product categories (e.g. Diesel, DEF), phone
-numbers, emails, websites, addresses, and route assignments. Once configured
-with valid API credentials, the script runs continuously until all records
-across all modules have been processed.
-
-**Note**: Running this script will update data in your CRM. Review and test
-carefully before executing in production. Do not commit your API credentials
-into source control.
-"""
-
-import json
-import logging
-import os
-import re
-import sys
-import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
-
+#!/usr/bin/env python3
+from __future__ import annotations
+import argparse,json,os,re,sys,time
+from collections import Counter
+from datetime import datetime,timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
 import requests
-from bs4 import BeautifulSoup
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-
-
-class ZohoCRMClient:
-    """A thin wrapper around the Zoho CRM REST API."""
-
-    def __init__(self, access_token: str, base_url: str = "https://www.zohoapis.com/crm/v2"):
-        self.access_token = access_token
-        self.base_url = base_url.rstrip("/")
-
-    def _headers(self) -> Dict[str, str]:
-        return {
-            "Authorization": f"Zoho-oauthtoken {self.access_token}",
-            "Content-Type": "application/json",
-        }
-
-    def list_records(self, module: str, page: int = 1, per_page: int = 200) -> Dict:
-        """
-        Retrieve a page of records from a given module. Adjust `per_page` as
-        necessary; Zoho CRM limits this to 200 per call.
-        """
-        url = f"{self.base_url}/{module}?page={page}&per_page={per_page}"
-        response = requests.get(url, headers=self._headers())
-        response.raise_for_status()
-        return response.json()
-
-    def update_record(self, module: str, record_id: str, data: Dict) -> Dict:
-        """Update a single record in the specified module."""
-        url = f"{self.base_url}/{module}/{record_id}"
-        payload = {"data": [data]}
-        response = requests.put(url, headers=self._headers(), data=json.dumps(payload))
-        response.raise_for_status()
-        return response.json()
-
-
-@dataclass
-class CompanyInfo:
-    """Container for information scraped about a company."""
-
-    products: List[str] = field(default_factory=list)
-    phone: Optional[str] = None
-    other_phone: Optional[str] = None
-    email: Optional[str] = None
-    website: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
-    notes: List[str] = field(default_factory=list)
-
-
-class CompanyScraper:
-    """
-    Provides methods to search for and extract company data from public web pages.
-
-    Note: Web scraping may violate the terms of service of some websites and
-    should respect robots.txt where appropriate. This example uses simple search
-    heuristics and is for demonstration purposes only. Consider using an
-    official API or third‑party data provider for production use.
-    """
-
-    def __init__(self):
-        self.session = requests.Session()
-
-    def _search_web(self, query: str, max_results: int = 5) -> List[str]:
-        """
-        Perform a simple web search using DuckDuckGo and return a list of result URLs.
-        In production you should integrate with a proper search API.
-        """
-        params = {"q": query, "format": "json", "no_html": 1}
-        search_url = "https://duckduckgo.com/html/"
-        try:
-            resp = self.session.get(search_url, params=params, timeout=10)
-            resp.raise_for_status()
-        except Exception as exc:
-            logging.warning(f"Search request failed for query '{query}': {exc}")
-            return []
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        links = []
-        for a in soup.select("a.result__a"):
-            href = a.get("href")
-            if href and href.startswith("http"):
-                links.append(href)
-            if len(links) >= max_results:
-                break
-        return links
-
-    def _extract_contact_info(self, html: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        """Simple heuristics to find phone number, email, and a secondary phone."""
-        phone_pattern = re.compile(r"\+?\d[\d\s().-]{7,}\d")
-        email_pattern = re.compile(r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}")
-        phones = phone_pattern.findall(html)
-        emails = email_pattern.findall(html)
-        primary_phone = phones[0] if phones else None
-        other_phone = phones[1] if len(phones) > 1 else None
-        email = emails[0] if emails else None
-        return primary_phone, other_phone, email
-
-    def _extract_address(self, html: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
-        """
-        Very simplistic address extraction. For real use cases, integrate with
-        geocoding or address-parsing services.
-        """
-        # Placeholder: look for a pattern like "123 Main St, City, ST 12345"
-        address_pattern = re.compile(r"([\dA-Za-z.,'\s-]+),(\s*)([A-Za-z\s]+),(\s*)([A-Z]{2})\s*(\d{5})")
-        match = address_pattern.search(html)
-        if match:
-            street = match.group(1).strip()
-            city = match.group(3).strip()
-            state = match.group(5).strip()
-            zip_code = match.group(6).strip()
-            return street, city, state, zip_code, "US"
-        return None, None, None, None, None
-
-    def scrape_company_info(self, company_name: str) -> CompanyInfo:
-        """
-        Given a company name, search the web and attempt to extract relevant data.
-        This method returns a CompanyInfo instance with populated fields.
-        """
-        info = CompanyInfo()
-        query = f"{company_name} fuel diesel supplier"
-        urls = self._search_web(query)
-        for url in urls:
-            try:
-                resp = self.session.get(url, timeout=10)
-                resp.raise_for_status()
-            except Exception:
-                continue
-            html = resp.text
-
-            # Identify product categories
-            lowered = html.lower()
-            if "diesel" in lowered:
-                if "diesel" not in info.products:
-                    info.products.append("Diesel")
-            if "def" in lowered or "diesel exhaust fluid" in lowered:
-                if "DEF" not in info.products:
-                    info.products.append("DEF")
-            if "bulk fuel" in lowered:
-                if "Bulk Fuel" not in info.products:
-                    info.products.append("Bulk Fuel")
-            if "gasoline" in lowered:
-                if "Gasoline" not in info.products:
-                    info.products.append("Gasoline")
-            if "propane" in lowered:
-                if "Propane" not in info.products:
-                    info.products.append("Propane")
-            if "kerosene" in lowered:
-                if "Kerosene" not in info.products:
-                    info.products.append("Kerosene")
-            if "lubricant" in lowered or "lubricants" in lowered:
-                if "Lubricants" not in info.products:
-                    info.products.append("Lubricants")
-            # Extract contact information only if not already found
-            if not info.phone or not info.email:
-                phone, other_phone, email = self._extract_contact_info(html)
-                info.phone = info.phone or phone
-                info.other_phone = info.other_phone or other_phone
-                info.email = info.email or email
-            # Extract address
-            if not info.address:
-                street, city, state, zip_code, country = self._extract_address(html)
-                if street:
-                    info.address = street
-                    info.city = city
-                    info.state = state
-                    info.zip_code = zip_code
-                    info.country = country
-            # Find website domain
-            if not info.website:
-                # Use the base URL as website
-                parsed = re.match(r"https?://([^/]+)/", url)
-                if parsed:
-                    info.website = f"https://{parsed.group(1)}"
-            # If we've filled enough details, break
-            if info.products and info.phone and info.email and info.address:
-                break
-        return info
-
-
-def determine_route(city: Optional[str], state: Optional[str]) -> Optional[str]:
-    """
-    Placeholder function to map a city/state to a route name. In practice,
-    populate this mapping using the Routes module from your CRM. Return None
-    if no suitable route is found.
-    """
-    if not state:
-        return None
-    # Example hardcoded mapping; extend as needed
-    route_map = {
-        ("TX",): "Texas",
-        ("CA",): "California",
-        ("FL",): "Florida",
-    }
-    for states, route_name in route_map.items():
-        if state.upper() in states:
-            return route_name
-    return None
-
-
-def enrich_module_records(crm: ZohoCRMClient, module: str, scraper: CompanyScraper):
-    """
-    Iterate through all records in a module and enrich each one with data from
-    public sources. Logs progress and updates.
-    """
-    page = 1
-    while True:
-        logging.info(f"Fetching {module} page {page}")
-        records_response = crm.list_records(module, page=page, per_page=200)
-        records = records_response.get("data", [])
-        if not records:
-            break  # No more pages
-        for record in records:
-            record_id = record.get("id")
-            company_name = record.get("Company_Name") or record.get("Account_Name") or record.get("Last_Name")
-            if not company_name:
-                continue
-            logging.info(f"Processing {module} record {record_id}: {company_name}")
-            info = scraper.scrape_company_info(company_name)
-            update_data = {}
-            # Append products to existing multi-select field if present
-            existing_products = record.get("Product") or []
-            all_products = set(existing_products) | set(info.products)
-            if all_products:
-                update_data["Product"] = list(all_products)
-            # Update phone fields
-            if info.phone and (not record.get("Phone")):
-                update_data["Phone"] = info.phone
-            if info.other_phone and (not record.get("Other_Phone")):
-                update_data["Other_Phone"] = info.other_phone
-            # Update email
-            if info.email and (not record.get("Email")):
-                update_data["Email"] = info.email
-            # Update website
-            if info.website and (not record.get("Website")):
-                update_data["Website"] = info.website
-            # Update address fields
-            if info.address and (not record.get("Address")):
-                update_data["Address" ] = info.address
-            if info.city and (not record.get("City")):
-                update_data["City"] = info.city
-            if info.state and (not record.get("State")):
-                update_data["State"] = info.state
-            if info.zip_code and (not record.get("Zip")):
-                update_data["Zip"] = info.zip_code
-            if info.country and (not record.get("Country")):
-                update_data["Country"] = info.country
-            # Route assignment
-            route = determine_route(info.city, info.state)
-            if route and (not record.get("Route")):
-                update_data["Route"] = route
-            if update_data:
-                try:
-                    crm.update_record(module, record_id, update_data)
-                    logging.info(f"Updated {module} record {record_id}: {update_data}")
-                except Exception as exc:
-                    logging.error(f"Failed to update {module} record {record_id}: {exc}")
-            # Throttle between records to avoid rate limits
-            time.sleep(1)
-        page += 1
-
-
+PORTAL="https://login.securesupplies.us/"
+E=json.loads(Path("factura_verified_enrichments.json").read_text(encoding="utf-8"))
+R=Path("factura_enrichment_report.json");A=Path("factura_enrichment_audit.jsonl");S=Path("factura_zoho_schema.json")
+class X(RuntimeError):pass
+def now():return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+def nt(v):return re.sub(r"[^a-z0-9]+","",str(v or "").lower())
+def ck(v):
+ w=re.findall(r"[a-z0-9]+",str(v or "").lower().replace("&"," and "));q={"incorporated","corporation","company","limited","holdings","llc","inc","corp","ltd","co"}
+ while w and w[-1] in q:w.pop()
+ return "".join(w)
+def cl(v):return re.sub(r"\s+"," ",str(v or "")).strip()
+def dom(v):
+ t=cl(v).lower()
+ if not t:return ""
+ if "@" in t and not t.startswith("http"):t=t.rsplit("@",1)[-1]
+ else:
+  if "://" not in t:t="https://"+t
+  u=urlparse(t);t=u.netloc or u.path.split("/")[0]
+ t=t.split(":",1)[0]
+ return t[4:] if t.startswith("www.") else t
+def dump(p,x):p.write_text(json.dumps(x,indent=2,ensure_ascii=False,default=str),encoding="utf-8")
+def pcheck():
+ try:
+  r=requests.get(PORTAL,timeout=15,allow_redirects=True);return {"reachable":r.status_code<500,"status_code":r.status_code,"final_url":r.url}
+ except Exception as e:return {"reachable":False,"error":str(e)[:300]}
+class Z:
+ def __init__(self):
+  self.s=requests.Session();self.cid=os.getenv("ZOHO_CLIENT_ID","");self.cs=os.getenv("ZOHO_CLIENT_SECRET_VALUE") or os.getenv("ZOHO_CLIENT_SECRET","");self.rt=os.getenv("ZOHO_REFRESH_TOKEN_VALUE") or os.getenv("ZOHO_REFRESH_TOKEN","");self.acc=(os.getenv("ZOHO_ACCOUNTS_DOMAIN") or "https://accounts.zoho.com").rstrip("/");self.api=(os.getenv("ZOHO_API_DOMAIN") or "https://www.zohoapis.com").rstrip("/");self.can=bool(self.cid and self.cs and self.rt);self.t=self.ref() if self.can else os.getenv("ZOHO_ACCESS_TOKEN","")
+  if not self.t:raise X("No Zoho OAuth credential configured")
+ def ref(self):
+  r=self.s.post(self.acc+"/oauth/v2/token",data={"refresh_token":self.rt,"client_id":self.cid,"client_secret":self.cs,"grant_type":"refresh_token"},timeout=30)
+  if r.status_code>=400:raise X(f"OAuth refresh HTTP {r.status_code}: {r.text[:400]}")
+  x=r.json();self.api=(x.get("api_domain") or self.api).rstrip("/")
+  if not x.get("access_token"):raise X("OAuth refresh returned no token")
+  return str(x["access_token"])
+ def call(self,m,p,params=None,body=None):
+  u=f"{self.api}/crm/v8/{p.lstrip('/')}";red=False
+  for i in range(5):
+   r=self.s.request(m,u,headers={"Authorization":f"Zoho-oauthtoken {self.t}","Content-Type":"application/json"},params=params,json=body,timeout=60)
+   if r.status_code==401 and self.can and not red:self.t=self.ref();red=True;continue
+   if r.status_code in {429,500,502,503,504} and i<4:time.sleep(min(2**(i+1),12));continue
+   if r.status_code==204:return {}
+   if r.status_code>=400:raise X(f"{m} {p} HTTP {r.status_code}: {r.text[:1200]}")
+   return r.json() if r.text.strip() else {}
+  raise X("API retry limit")
+ def mods(self):return self.call("GET","settings/modules").get("modules",[])
+ def fields(self,m):return self.call("GET","settings/fields",params={"module":m}).get("fields",[])
+ def records(self,m,fs):
+  o=[];pg=1;fs=list(dict.fromkeys(x for x in fs if x))[:50]
+  while 1:
+   x=self.call("GET",m,params={"page":pg,"per_page":200,"fields":",".join(fs),"sort_by":"id","sort_order":"asc"});b=x.get("data",[]);o+=b
+   if not b or not (x.get("info") or {}).get("more_records"):return o
+   pg+=1
+ def update(self,m,rows):
+  q={"submitted":0,"success":0,"failed":0,"details":[]}
+  for i in range(0,len(rows),100):
+   b=rows[i:i+100];x=self.call("PUT",m,body={"data":b,"trigger":[]});it=x.get("data",[]);q["submitted"]+=len(b);q["details"]+=it
+   q["success"]+=sum(str(z.get("status","")).lower()=="success" for z in it);q["failed"]+=sum(str(z.get("status","")).lower()!="success" for z in it)+max(0,len(b)-len(it))
+  return q
+def mt(m):return {nt(m.get(k)) for k in ("api_name","module_name","plural_label","singular_label") if m.get(k)}
+def module(ms,k):
+ z=[]
+ for m in ms:
+  t=mt(m);s=0
+  if k=="v":s=100 if t&{"vendorcontacts","vendorcontact"} else 90 if any("vendor" in x and "contact" in x for x in t) else 65 if t&{"vendors","vendor"} else 0
+  else:s=100 if t&{"routes","route"} else 80 if any("route" in x for x in t) else 0
+  if s:z.append((s,m))
+ return max(z,key=lambda x:x[0])[1] if z else None
+FA={"vn":["Vendor Name","Vendor Contact Name","Company Name","Account Name","Name","Vendor"],"p":["000 Products","000 Product","Primary Product","Main Product","Products","Product"],"st":["Street Address","Physical Address","Vendor Address","Mailing Street","Street","Address"],"a2":["Address Line 2","Address 2","Suite","Unit","Mailing Street 2"],"ci":["City","Mailing City","Vendor City"],"sa":["State","Mailing State","State Province","Vendor State"],"zi":["ZIP Code","Zip","Postal Code","Mailing Zip","Mailing Postal Code"],"co":["Country","Mailing Country","Vendor Country"],"ro":["Routes","Route","Assigned Route","Route Number","Route Name"],"ph":["Main Business Phone","Business Phone","Phone","Vendor Phone","Main Phone"],"fa":["Fax","Fax Number"],"em":["Business Email","Vendor Email","Email","Sales Email"],"we":["Official Website","Website","Vendor Website","URL"],"cn":["Contact Name","Primary Contact","Public Contact Name"],"ct":["Contact Title","Title","Job Title"],"li":["LinkedIn","LinkedIn Company Page"],"so":["Enrichment Source","Source URL","Source","Research Source"],"ve":["Verification Date","Verified At","Last Verified","Enriched Date"]}
+LM={"000 Products":"p","Street Address":"st","Address Line 2":"a2","City":"ci","State":"sa","ZIP":"zi","Country":"co","Routes":"ro","Phone":"ph","Fax":"fa","Email":"em","Website":"we","Contact Name":"cn","Contact Title":"ct","LinkedIn":"li","Source":"so","Verification Date":"ve"}
+def ft(f):return {nt(f.get(k)) for k in ("field_label","api_name","display_label") if f.get(k)}
+def wr(f):
+ if f.get("read_only") is True:return False
+ o=f.get("operation_type") or {};return bool(f.get("api_name")) and not(isinstance(o,dict) and o.get("api_update") is False)
+def fmap(fs,k):
+ for l in FA[k]:
+  t=nt(l);q=[f for f in fs if wr(f) and t in ft(f)]
+  if q:return sorted(q,key=lambda f:nt(f.get("field_label"))!=t)[0]
+ return None
+def tv(v):
+ if isinstance(v,str):return [v] if v.strip() else []
+ if isinstance(v,list):return [s for x in v for s in tv(x)]
+ if isinstance(v,dict):return [s for k in ("name","display_value","actual_value","value") for s in tv(v.get(k))]
+ return []
+def lm(f):
+ for k in ("lookup","multiselectlookup","multi_select_lookup"):
+  o=f.get(k)
+  if isinstance(o,dict):
+   m=o.get("module")
+   if isinstance(m,dict) and m.get("api_name"):return str(m["api_name"])
+   if o.get("api_name"):return str(o["api_name"])
+ return ""
+class I:
+ def __init__(self,z):self.z=z;self.c={}
+ def load(self,m):
+  if m not in self.c:
+   f=self.z.fields(m);self.c[m]=(f,self.z.records(m,[x["api_name"] for x in f if x.get("api_name")][:50]))
+  return self.c[m]
+ def eid(self,m,targets,route=0):
+  _,rs=self.load(m);w={nt(x) for x in targets if x};q=[]
+  for r in rs:
+   ss=[s for v in r.values() for s in tv(v)]
+   if not w&{nt(s) for s in ss}:continue
+   nums=[int(a.group(1)) for s in ss if (a:=re.match(r"\s*(\d+)",s))];q.append((min(nums or [10**9]),str(r.get("id")),ss[0] if ss else ""))
+  if not q:return None,"no exact CRM reference"
+  q.sort(key=lambda x:x[0] if route else 0);return q[0][1],"exact CRM reference "+q[0][2]
+ def product(self,f,v):
+  d=str(f.get("data_type") or "").lower();ops={"Diesel Fuel":["Diesel Fuel","Diesel","ULSD"],"DEF":["DEF","Diesel Exhaust Fluid"],"Propane":["Propane","Propane / LPG","LPG"]}.get(v,[v])
+  if "lookup" in d:
+   m=lm(f)
+   if not m:return None,"product lookup module missing"
+   x,w=self.eid(m,ops);return (([{"id":x}] if "multi" in d else {"id":x}) if x else None),w
+  if "picklist" in d:
+   a=[p.get("actual_value",p.get("display_value")) for p in f.get("pick_list_values") or []]
+   for x in ops:
+    for y in a:
+     if y is not None and nt(x)==nt(y):return ([y] if "multi" in d else y),"existing taxonomy "+str(y)
+   return None,"product option missing"
+  return v,"direct"
+ def route(self,f,c,n,rm):
+  d=str(f.get("data_type") or "").lower()
+  if "lookup" in d:
+   m=lm(f) or rm
+   if not m:return None,"route lookup module missing"
+   x,w=self.eid(m,[c,n],1);return (([{"id":x}] if "multi" in d else {"id":x}) if x else None),w
+  if "picklist" in d:
+   a=[p.get("actual_value",p.get("display_value")) for p in f.get("pick_list_values") or []]
+   for x in (c,n):
+    for y in a:
+     if y is not None and nt(x)==nt(y):return ([y] if "multi" in d else y),"existing route "+str(y)
+   return None,"route option missing"
+  return c,"direct"
+def sv(k,v):
+ if v is None:return None
+ if isinstance(v,str):
+  v=cl(v)
+  if not v:return None
+  if k=="Contact Name" and nt(v) in {"ext","extension","na","none"}:return None
+  if k=="Email" and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+",v):return None
+  if k in {"Website","LinkedIn","Source"} and not v.lower().startswith(("http://","https://")):return None
+  if k=="Country" and v!="United States":return None
+ return v
+def eq(a,b):
+ if isinstance(a,dict) and isinstance(b,dict):return str(a.get("id",""))==str(b.get("id",""))
+ if isinstance(a,list) and isinstance(b,list):
+  x=sorted(str(z.get("id")) for z in a if isinstance(z,dict) and z.get("id"));y=sorted(str(z.get("id")) for z in b if isinstance(z,dict) and z.get("id"))
+  if x or y:return x==y
+ return nt(a)==nt(b)
+def match(r,na,e,f):
+ n=tv(r.get(na))
+ if not n or ck(n[0]) not in {ck(x) for x in e["a"]}:return False
+ ex=dom(e["d"].get("Website") or e["d"].get("Email"));ds=set()
+ for k in ("we","em"):
+  x=f.get(k)
+  if x:ds|={dom(v) for v in tv(r.get(x["api_name"])) if dom(v)}
+ if ex and ds and ex not in ds:return False
+ if e["n"]=="American Energy / FuelOilNow.com" and ck(n[0])=="americanenergy":
+  ci=cl(r.get(f["ci"]["api_name"])) if f.get("ci") else "";sa=cl(r.get(f["sa"]["api_name"])) if f.get("sa") else ""
+  if ex not in ds and not(nt(ci)==nt(e["d"]["City"]) and nt(sa)==nt(e["d"]["State"])):return False
+ return True
+def run(mode,limit):
+ z=Z();ms=z.mods();vm=module(ms,"v");rm=module(ms,"r")
+ if not vm:raise X("Vendor Contacts module not found")
+ va=str(vm["api_name"]);ra=str(rm["api_name"]) if rm else "";fs=z.fields(va);f={k:fmap(fs,k) for k in FA}
+ if not f["vn"]:raise X("Vendor name field not found")
+ na=str(f["vn"]["api_name"]);rec=z.records(va,["id",na]+[str(x["api_name"]) for x in f.values() if x]);ix=I(z);rows=[];au=[];c=Counter();ma=set()
+ for r in rec:
+  q=[e for e in E if match(r,na,e,f)]
+  if not q:continue
+  if len(q)!=1:au.append({"status":"ambiguous","record_id":r.get("id"),"matches":[x["n"] for x in q]});c["ambiguous"]+=1;continue
+  e=q[0];ma.add(e["n"]);u={"id":r["id"]};ch=[];sk=[]
+  for k in ["000 Products","Street Address","Address Line 2","City","State","ZIP","Country","Routes","Phone","Fax","Email","Website","Contact Name","Contact Title","LinkedIn","Source","Verification Date"]:
+   if k not in e["s"]:continue
+   v=sv(k,e["d"].get(k))
+   if v is None:continue
+   ff=f.get(LM[k])
+   if not ff:sk.append({"field":k,"reason":"field not found"});continue
+   d=str(ff.get("data_type") or "").lower();cv=v;why="direct"
+   if k=="000 Products":cv,why=ix.product(ff,str(v))
+   elif k=="Routes":cv,why=ix.route(ff,str(v),str(e["d"].get("Route Name") or ""),ra)
+   elif "date" in d:cv=str(v)[:10]
+   elif "multiselectpicklist" in d and not isinstance(v,list):cv=[v]
+   elif k=="Source" and "picklist" in d:cv=None;why="source picklist unsafe"
+   if cv is None:sk.append({"field":k,"reason":why});continue
+   api=str(ff["api_name"])
+   if eq(r.get(api),cv):c["already_current"]+=1;continue
+   u[api]=cv;ch.append({"field":k,"api":api,"old":r.get(api),"new":cv,"source":e["d"].get("Source"),"conversion":why})
+  name=tv(r.get(na))[0] if tv(r.get(na)) else ""
+  if len(u)==1:au.append({"status":"no changes","record_id":r["id"],"record_name":name,"canonical":e["n"],"skips":sk});c["no_changes"]+=1;continue
+  if limit and len(rows)>=limit:c["limit"]+=1;continue
+  rows.append(u);au.append({"status":"prepared","record_id":r["id"],"record_name":name,"canonical":e["n"],"changes":ch,"skips":sk});c["records"]+=1;c["fields"]+=len(ch)
+ res={"submitted":0,"success":0,"failed":0,"details":[]}
+ if mode=="apply" and rows:res=z.update(va,rows)
+ with A.open("w",encoding="utf-8") as h:
+  for x in au:h.write(json.dumps(x,ensure_ascii=False,default=str)+"\n")
+ dump(S,{"vendor_module":vm,"routes_module":rm,"fields":{k:(v and {"label":v.get("field_label"),"api":v.get("api_name"),"type":v.get("data_type")}) for k,v in f.items()}})
+ return {"generated_at":now(),"mode":mode,"portal":pcheck(),"vendor_module":va,"routes_module":ra or None,"records_scanned":len(rec),"staged_vendors":len(E),"matched_vendors":len(ma),"unmatched":sorted({x["n"] for x in E}-ma),"records_prepared":len(rows),"counters":dict(c),"apply_result":res}
+def test():
+ assert ck("J.T. Horn Oil Co., Inc.")==ck("JT Horn Oil")
+ assert dom("sales@suncoastresources.com")=="suncoastresources.com"
+ assert len(E)==17 and sum(x["d"]["000 Products"]=="Diesel Fuel" for x in E)==15
+ print("FACTURA verified enrichment self-test passed")
 def main():
-    access_token = os.getenv("ZOHO_ACCESS_TOKEN")
-    if not access_token:
-        logging.error("Please set the ZOHO_ACCESS_TOKEN environment variable.")
-        sys.exit(1)
-    crm = ZohoCRMClient(access_token)
-    scraper = CompanyScraper()
-    # Enrich Leads
-    enrich_module_records(crm, "Leads", scraper)
-    # Enrich Accounts
-    enrich_module_records(crm, "Accounts", scraper)
-    # Enrich Contacts
-    enrich_module_records(crm, "Contacts", scraper)
-
-
-if __name__ == "__main__":
-    main()
+ p=argparse.ArgumentParser();p.add_argument("--mode",choices=["audit","apply"],default=os.getenv("FACTURA_ENRICH_MODE","audit"));p.add_argument("--max-updates",type=int,default=100);p.add_argument("--self-test",action="store_true");a=p.parse_args()
+ if a.self_test:test();return 0
+ x={"started_at":now(),"status":"started","mode":a.mode}
+ try:x.update(run(a.mode,a.max_updates));x["status"]="completed" if x["apply_result"]["failed"]==0 else "completed_with_errors";x["finished_at"]=now();dump(R,x);print(json.dumps(x,indent=2,ensure_ascii=False,default=str));return 0 if x["apply_result"]["failed"]==0 else 4
+ except Exception as e:x.update({"status":"failed","error":str(e),"finished_at":now(),"portal":pcheck()});dump(R,x);print(json.dumps(x,indent=2),file=sys.stderr);return 1
+if __name__=="__main__":raise SystemExit(main())
