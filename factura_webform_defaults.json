@@ -1,0 +1,17 @@
+{
+  "lead_owner_email": "fuels@securesupplies.us",
+  "notification_email": "fuels@securesupplies.us",
+  "phone_country": "US",
+  "phone_format": "(###) ###-####",
+  "client_email_domains_allowed": "all",
+  "email_domain_restriction": null,
+  "webform_fields": [
+    "Name",
+    "Email",
+    "Phone",
+    "Company",
+    "Product Interest"
+  ],
+  "activation_status": "defaults recorded; Zoho webform not yet published",
+  "recorded_at": "2026-06-19"
+}
