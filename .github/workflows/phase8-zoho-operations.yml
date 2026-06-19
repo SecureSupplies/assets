@@ -1,0 +1,124 @@
+name: Phase 8 Zoho CRM Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Zoho operation to execute
+        required: true
+        type: choice
+        default: audit
+        options:
+          - audit
+          - field-dry-run
+          - field-apply
+          - sync-dry-run
+          - sync-live
+      confirmation:
+        description: Enter DEPLOY_PHASE8 for field-apply or sync-live
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase8-zoho-production
+  cancel-in-progress: false
+
+jobs:
+  operate:
+    runs-on: ubuntu-latest
+    environment: zoho-production
+    defaults:
+      run:
+        working-directory: phase8-government-biz
+    env:
+      PHASE8_OUTPUT_DIR: out
+      PHASE8_ENABLE_NOTIFICATIONS: "false"
+      ZOHO_CLIENT_ID: ${{ secrets.ZOHO_CLIENT_ID }}
+      ZOHO_CLIENT_SECRET_VALUE: ${{ secrets.ZOHO_CLIENT_SECRET_VALUE }}
+      ZOHO_REFRESH_TOKEN_VALUE: ${{ secrets.ZOHO_REFRESH_TOKEN_VALUE }}
+      ZOHO_API_DOMAIN: ${{ vars.ZOHO_API_DOMAIN || 'https://www.zohoapis.com' }}
+      ZOHO_ACCOUNTS_DOMAIN: ${{ vars.ZOHO_ACCOUNTS_DOMAIN || 'https://accounts.zoho.com' }}
+      SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+      EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+      OPERATION: ${{ inputs.operation }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: phase8-government-biz/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Validate Zoho configuration
+        shell: bash
+        run: |
+          missing=0
+          for name in ZOHO_CLIENT_ID ZOHO_CLIENT_SECRET_VALUE ZOHO_REFRESH_TOKEN_VALUE; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is not configured in the zoho-production environment"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Execute controlled Zoho operation
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$OPERATION" in
+            audit)
+              PHASE8_DRY_RUN=true python -m crm.deploy_phase8 --audit
+              ;;
+            field-dry-run)
+              PHASE8_DRY_RUN=true python -m crm.deploy_phase8 --apply --dry-run
+              ;;
+            field-apply)
+              if [ "$CONFIRMATION" != "DEPLOY_PHASE8" ]; then
+                echo "::error::field-apply requires confirmation DEPLOY_PHASE8"
+                exit 2
+              fi
+              PHASE8_DRY_RUN=false \
+              PHASE8_ENABLE_CRM_WRITES=true \
+              PHASE8_DEPLOY_CONFIRMATION="$CONFIRMATION" \
+              python -m crm.deploy_phase8 --apply
+              ;;
+            sync-dry-run)
+              PHASE8_DRY_RUN=true \
+              PHASE8_ENABLE_CRM_WRITES=false \
+              python run_pipeline.py --mode production --deploy-fields --limit-per-source 100
+              ;;
+            sync-live)
+              if [ "$CONFIRMATION" != "DEPLOY_PHASE8" ]; then
+                echo "::error::sync-live requires confirmation DEPLOY_PHASE8"
+                exit 2
+              fi
+              PHASE8_DRY_RUN=false \
+              PHASE8_ENABLE_CRM_WRITES=true \
+              PHASE8_DEPLOY_CONFIRMATION="$CONFIRMATION" \
+              python run_pipeline.py --mode production --deploy-fields --limit-per-source 100
+              ;;
+            *)
+              echo "::error::Unknown operation: $OPERATION"
+              exit 2
+              ;;
+          esac
+
+      - name: Upload Zoho operation outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase8-zoho-${{ inputs.operation }}-${{ github.run_id }}
+          path: phase8-government-biz/out/
+          if-no-files-found: warn
+          retention-days: 30
