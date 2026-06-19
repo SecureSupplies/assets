@@ -20,13 +20,21 @@ from .zoho_auth import ZohoAuth
 
 
 EXTERNAL_ID_LABEL = "Phase8 External ID"
+EXTRA_FIELDS = {
+    "GOV FAST PURCHASE POSTS": ["Unit of Measure"],
+    "LEADS GOV": ["Unit of Measure"],
+    "GOV OPPORTUNITIES": ["Unit of Measure"],
+    "GOV PRICE INTEL": ["Unit of Measure"],
+    "GOV SUPPLIER CAPACITY": ["Unit of Measure"],
+}
 GENERIC_STATUS = ["New", "Active", "Review", "Submitted", "Won", "Lost", "Closed", "Watch", "Inactive"]
-TEXTAREA_HINTS = ["Notes", "JSON", "Strategy", "Script", "Instructions", "Documents", "Requirement", "Action Plan", "Compliance", "Payload", "Description", "Error Details", "Error Message"]
-BOOLEAN_HINTS = ["Eligible", "Possible", "Trigger", "Watch", "Required", "Available", "Availability", "Need"]
+TEXTAREA_HINTS = ["Notes", "JSON", "Strategy", "Script", "Instructions", "Documents", "Requirement", "Action Plan", "Compliance", "Payload", "Description", "Error Details", "Error Message", "Likely Purchase Need"]
+BOOLEAN_EXACT = {"Direct PO Eligible", "Purchase Card Possible", "Emergency Trigger", "Credit Card / P-Card Possible", "Emergency Supplier Need", "Incumbent Renewal Watch", "Credential Required", "Emergency Availability"}
+BOOLEAN_HINTS = ["Eligible", "Possible", "Trigger", "Required", "Available", "Availability"]
 CURRENCY_HINTS = ["Estimated Value", "Recurring Value", "Award Amount", "Obligation Amount", "Current Bid", "Market Value", "Repair Cost", "Resale Value", "Rental Value", "Logistics Cost", "Index Price", "Supplier Price", "Freight Estimate", "Delivered Price", "Margin Target", "Last Award Amount", "Historical Spend"]
 INTEGER_HINTS = ["Score", "Probability", "Records Pulled", "Records Inserted", "Records Updated", "Records Failed"]
 DATETIME_LABELS = {"Last Sync Time", "Last Success Time", "Pulled At"}
-DOUBLE_LABELS = {"Estimated Gallons / Units", "Estimated Gallons / Units", "Estimated Volume"}
+DOUBLE_LABELS = {"Estimated Gallons / Units", "Estimated Volume"}
 
 
 def normalize_label(value: object) -> str:
@@ -46,6 +54,9 @@ def desired_fields(module_name: str) -> List[str]:
     fields = list(MODULE_FIELDS[module_name])
     if EXTERNAL_ID_LABEL not in fields:
         fields.insert(1, EXTERNAL_ID_LABEL)
+    for label in EXTRA_FIELDS.get(module_name, []):
+        if label not in fields:
+            fields.append(label)
     return fields
 
 
@@ -80,8 +91,6 @@ def infer_type(module_name: str, label: str) -> str:
         return "integer"
     if any(hint in label for hint in CURRENCY_HINTS):
         return "currency"
-    if any(hint in label for hint in BOOLEAN_HINTS):
-        return "boolean"
     if "Email" in label:
         return "email"
     if "Phone" in label:
@@ -90,6 +99,8 @@ def infer_type(module_name: str, label: str) -> str:
         return "website"
     if any(hint in label for hint in TEXTAREA_HINTS):
         return "textarea"
+    if label in BOOLEAN_EXACT or any(hint in label for hint in BOOLEAN_HINTS):
+        return "boolean"
     return "text"
 
 
@@ -162,13 +173,12 @@ class ZohoModuleDeployer:
         self.session.headers.update(self.headers)
 
     def _request(self, method: str, path: str, **kwargs: object) -> requests.Response:
-        response = self.session.request(
+        return self.session.request(
             method,
             f"{self.api_domain}/crm/v8/{path.lstrip('/')}",
             timeout=self.settings.request_timeout_seconds,
             **kwargs,
         )
-        return response
 
     def get_modules(self) -> Dict[str, object]:
         response = self._request("GET", "settings/modules")
