@@ -1,0 +1,16 @@
+[
+  {"name":"SAM.gov Contract Opportunities","type":"Federal opportunity","url":"https://open.gsa.gov/api/get-opportunities-public-api/","access":"API","free_or_paid":"Free","credential_required":true,"status":"enabled_when_key_present"},
+  {"name":"SAM.gov Contract Awards","type":"Federal awards","url":"https://open.gsa.gov/api/contract-awards/","access":"API","free_or_paid":"Free","credential_required":true,"status":"stubbed_pending_contract"},
+  {"name":"USAspending","type":"Federal spend/awards","url":"https://api.usaspending.gov/docs/endpoints","access":"API","free_or_paid":"Free","credential_required":false,"status":"enabled"},
+  {"name":"GSA Auctions","type":"Auction/surplus","url":"https://gsa.github.io/auctions_api/","access":"Public API","free_or_paid":"Free","credential_required":false,"status":"enabled"},
+  {"name":"EIA Open Data","type":"Pricing/market signal","url":"https://www.eia.gov/opendata/","access":"API","free_or_paid":"Free","credential_required":true,"status":"enabled_when_key_present"},
+  {"name":"National Weather Service Alerts","type":"Weather/disaster","url":"https://www.weather.gov/documentation/services-web-api","access":"API","free_or_paid":"Free","credential_required":false,"status":"enabled"},
+  {"name":"OpenFEMA Disaster Declarations","type":"Disaster declarations","url":"https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries","access":"API","free_or_paid":"Free","credential_required":false,"status":"enabled"},
+  {"name":"NASPO/SIOE State Procurement Registry","type":"State/territory registry","url":"https://www.naspo.org/states/","access":"Registry","free_or_paid":"Free","credential_required":false,"status":"enabled"},
+  {"name":"HigherGov","type":"Gov market intelligence","url":"https://www.highergov.com/api/","access":"API","free_or_paid":"Paid/may-cost","credential_required":true,"status":"optional_disabled"},
+  {"name":"Deltek GovWin IQ","type":"Gov market intelligence","url":"https://www.deltek.com/en/products/govwin","access":"Licensed API/export","free_or_paid":"Paid/may-cost","credential_required":true,"status":"optional_disabled"},
+  {"name":"OPIS","type":"Fuel/rack pricing","url":"https://www.opis.com/product/pricing/fuel-rack-prices/","access":"Licensed API/export","free_or_paid":"Paid/may-cost","credential_required":true,"status":"optional_disabled"},
+  {"name":"Argus","type":"Commodity pricing","url":"https://www.argusmedia.com/en","access":"Licensed API/export","free_or_paid":"Paid/may-cost","credential_required":true,"status":"optional_disabled"},
+  {"name":"Platts/S&P Commodity Insights","type":"Commodity pricing","url":"https://developer.spglobal.com/commodityinsights/api/getting-started","access":"Licensed API","free_or_paid":"Paid/may-cost","credential_required":true,"status":"optional_disabled"},
+  {"name":"DTN FastRacks","type":"Fuel pricing","url":"https://www.dtn.com/refined-fuels/buyer/fastracks/","access":"Licensed API/export","free_or_paid":"Paid/may-cost","credential_required":true,"status":"optional_disabled"}
+]

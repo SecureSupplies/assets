@@ -1,0 +1,24 @@
+name: Phase 8 Government Biz
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: phase8-government-biz
+    env:
+      PHASE8_DRY_RUN: "true"
+      PHASE8_NOTIFICATION_TO: fuels@securesupplies.us
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+      - run: python run_pipeline.py --mode test --include-samples --limit-per-source 100

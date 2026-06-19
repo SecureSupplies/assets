@@ -1,0 +1,30 @@
+{
+  "lanes": [
+    "Diesel / ULSD / clear diesel",
+    "Red diesel / off-road diesel",
+    "Emergency generator fuel",
+    "DEF / AdBlue / AUS32",
+    "Jet A / Jet A-1 / aviation fuel",
+    "Avgas",
+    "Marine diesel / MGO / bunkering",
+    "Propane / LPG",
+    "CNG / LNG / RNG / natural gas",
+    "Hydrogen / H2",
+    "Oxygen / O2 / LOX",
+    "Nitrogen / N2 / LIN",
+    "CO2 / carbon dioxide",
+    "Helium / He",
+    "Argon / specialty gases",
+    "Ammonia / urea / UAN / NPK / fertilizers",
+    "Water / wastewater chemicals",
+    "Fuel tanks / DEF tanks / water tanks / gas tanks",
+    "Tank rentals",
+    "Pumps / dispensers / fuel management / telemetry",
+    "Auction assets",
+    "Data center fuel / backup power fuel",
+    "Emergency response fuel"
+  ],
+  "fast_lane_tags": [
+    "TANK_PLUS_FUEL", "DIESEL_PLUS_DEF", "EMERGENCY_GENERATOR_FUEL", "AIRPORT_JET_A", "PORT_MARINE_DIESEL", "WASTEWATER_OXYGEN", "HOSPITAL_OXYGEN", "PROPANE_ROUTE", "CNG_LNG_PROJECT", "FERTILIZER_SEASONAL", "SURPLUS_TANK_ASSET", "DLA_ENERGY", "DIRECT_PO", "SIMPLIFIED_ACQUISITION", "AUCTION_MARGIN", "DISASTER_RESPONSE", "DATA_CENTER_BACKUP_FUEL"
+  ]
+}

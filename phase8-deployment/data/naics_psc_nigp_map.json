@@ -1,0 +1,14 @@
+{
+  "541614": {
+    "naics": "541614",
+    "description": "Process, Physical Distribution, and Logistics Consulting Services",
+    "psc": ["R706"],
+    "nigp": ["96156"]
+  },
+  "324110": {
+    "naics": "324110",
+    "description": "Petroleum Refineries",
+    "psc": ["9130", "9131"],
+    "nigp": ["40510", "40520"]
+  }
+}

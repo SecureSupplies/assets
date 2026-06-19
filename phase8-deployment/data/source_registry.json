@@ -1,0 +1,44 @@
+{
+  "sam_contract_opportunities": {
+    "name": "SAM Contract Opportunities",
+    "type": "federal",
+    "url": "https://sam.gov/api/prod/",
+    "requires_api_key": true,
+    "enabled": true
+  },
+  "usaspending_awards": {
+    "name": "USAspending Award Search",
+    "type": "federal",
+    "url": "https://api.usaspending.gov/",
+    "requires_api_key": false,
+    "enabled": true
+  },
+  "gsa_auctions": {
+    "name": "GSA Auctions",
+    "type": "auction",
+    "url": "https://gsaauctions.gov/",
+    "requires_api_key": false,
+    "enabled": true
+  },
+  "eia_price_intel": {
+    "name": "EIA Open Data",
+    "type": "price_intel",
+    "url": "https://api.eia.gov/",
+    "requires_api_key": true,
+    "enabled": true
+  },
+  "nws_alerts": {
+    "name": "National Weather Service Alerts",
+    "type": "disaster",
+    "url": "https://api.weather.gov/alerts",
+    "requires_api_key": false,
+    "enabled": true
+  },
+  "openfema_disasters": {
+    "name": "OpenFEMA Disaster Declarations",
+    "type": "disaster",
+    "url": "https://www.fema.gov/openfema-data-page/disaster-declarations-summaries",
+    "requires_api_key": false,
+    "enabled": true
+  }
+}
