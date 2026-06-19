@@ -37,7 +37,7 @@ The existing Zoho menu/tab group is `Phase 8 Government Biz`. It must contain th
 
 `GOV FAST PURCHASE POSTS` is the top money queue. Scores 85-100 route to `Call Now`, 70-84 to `Quote Now`, 55-69 to `Procurement Review`, and lower scores to watch/no-bid handling. Expired notices are excluded from active call and quote queues.
 
-Zoho generates custom-module and custom-field API names. The deployment code reads those names from live metadata rather than deriving them from labels.
+Zoho generates custom-module and custom-field API names. The deployment code reads those names from live metadata rather than deriving names from labels.
 
 See [`docs/ZOHO_MODULE_SHELL_CHECKLIST.md`](docs/ZOHO_MODULE_SHELL_CHECKLIST.md) for the exact module and primary-field labels.
 
@@ -137,5 +137,7 @@ Production mode:
 ## Automation
 
 `.github/workflows/phase8-government-biz.yml` compiles the package, runs regression tests, executes the isolated pipeline dry-run, and uploads validation outputs. It never performs live CRM writes.
+
+`.github/workflows/phase8-zoho-operations.yml` provides protected manual operations for `audit`, `field-dry-run`, `field-apply`, `sync-dry-run`, and `sync-live`. Live operations require the `zoho-production` environment, configured Zoho OAuth secrets, and the exact `DEPLOY_PHASE8` confirmation.
 
 `scheduler.yaml` defines the operating cadence for urgent checks, full synchronization, and disaster/weather monitoring. Production scheduling should call the controlled commands above from an environment that has the approved Zoho OAuth configuration.
