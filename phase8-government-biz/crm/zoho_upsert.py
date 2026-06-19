@@ -196,7 +196,6 @@ def source_health_to_labels(health: SourceHealth) -> Dict[str, object]:
         "Records Failed": health.records_failed,
         "Error Message": health.error_message,
         "Status": health.status,
-        "Owner": health.owner,
     }
 
 
@@ -329,8 +328,11 @@ class ZohoUpsertClient:
             row: Dict[str, object] = {}
             for label, value in label_row.items():
                 field = by_label.get(normalize_label(label))
-                if field and field.get("api_name"):
-                    row[str(field["api_name"])] = self._coerce_value(value, field)
+                if not field or not field.get("api_name"):
+                    continue
+                if str(field.get("data_type") or "") in {"ownerlookup", "userlookup"} and not isinstance(value, dict):
+                    continue
+                row[str(field["api_name"])] = self._coerce_value(value, field)
 
             title = str(label_row.get(desired_primary) or label_row.get("Raw Record Name") or label_row.get("Source Name") or "Phase 8 Record")
             if primary_field and primary_field.get("api_name"):
@@ -409,10 +411,11 @@ class ZohoUpsertClient:
             for index, external_value in enumerate(batch_values):
                 item = response_rows[index] if index < len(response_rows) else {}
                 if item.get("status") == "success":
-                    action = str(item.get("action") or "").lower()
+                    action = str(item.get("action") or "insert").lower()
                     if action == "update":
                         result["updated"] += 1
                     else:
+                        action = "insert"
                         result["inserted"] += 1
                     record_id = str((item.get("details") or {}).get("id") or "")
                     if record_id:
@@ -420,6 +423,7 @@ class ZohoUpsertClient:
                             "id": record_id,
                             "module_api_name": module_api_name,
                             "module_name": module_name,
+                            "action": action,
                         }
                 else:
                     result["failed"] += 1
