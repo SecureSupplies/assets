@@ -13,7 +13,7 @@ on:
       - .github/workflows/enrich-crm.yml
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: factura-vendor-enrichment
@@ -86,6 +86,55 @@ jobs:
           PY
           fi
 
+      - name: Write redacted operational status
+        if: always()
+        env:
+          FACTURA_RUN_ID: ${{ github.run_id }}
+          FACTURA_EVENT: ${{ github.event_name }}
+          FACTURA_COMMIT: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          p = Path('factura_enrichment_report.json')
+          report = json.loads(p.read_text()) if p.exists() else {}
+          applied = report.get('apply_result') or {}
+          status = {
+              'generated_at': datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+              'workflow_run_id': os.getenv('FACTURA_RUN_ID'),
+              'event': os.getenv('FACTURA_EVENT'),
+              'commit': os.getenv('FACTURA_COMMIT'),
+              'cadence_utc': 'minute 17 every 3 hours',
+              'status': report.get('status', 'report_missing'),
+              'mode': report.get('mode'),
+              'records_scanned': report.get('records_scanned', 0),
+              'staged_vendors': report.get('staged_vendors', 0),
+              'matched_vendors': report.get('matched_vendors', 0),
+              'records_prepared': report.get('records_prepared', 0),
+              'submitted': applied.get('submitted', 0),
+              'successful': applied.get('success', 0),
+              'failed': applied.get('failed', 0),
+              'counters': report.get('counters', {}),
+              'error': str(report.get('error', ''))[:500],
+          }
+          Path('factura_execution_status.json').write_text(json.dumps(status, indent=2) + '\n')
+          PY
+
+      - name: Persist operational status
+        if: always()
+        run: |
+          git config user.name 'factura-enrichment-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add factura_execution_status.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record FACTURA enrichment execution status'
+            git pull --rebase origin master
+            git push origin HEAD:master
+          fi
+
       - name: Upload FACTURA audit package
         if: always()
         uses: actions/upload-artifact@v4
@@ -95,5 +144,6 @@ jobs:
             factura_enrichment_report.json
             factura_enrichment_audit.jsonl
             factura_zoho_schema.json
+            factura_execution_status.json
           if-no-files-found: warn
           retention-days: 30
