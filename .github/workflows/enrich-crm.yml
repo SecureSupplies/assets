@@ -3,31 +3,94 @@ name: Enrich CRM Data
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 19 * * *'
+    - cron: '17 */3 * * *'
+  push:
+    branches:
+      - master
+    paths:
+      - enrich_crm_script.py
+      - factura_verified_enrichments.json
+      - .github/workflows/enrich-crm.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factura-vendor-enrichment
+  cancel-in-progress: false
 
 jobs:
   enrich:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: pip install requests beautifulsoup4
-      - name: Enrich CRM
-        env:
-          ZOHO_ACCESS_TOKEN: ${{ secrets.ZOHO_ACCESS_TOKEN }}
-          ZOHO_CLIENT_ID: ${{ secrets.ZOHO_CLIENT_ID }}
-          ZOHO_CLIENT_SECRET: ${{ secrets.ZOHO_CLIENT_SECRET }}
-          ZOHO_REFRESH_TOKEN: ${{ secrets.ZOHO_REFRESH_TOKEN }}
+          python-version: '3.12'
+
+      - name: Install runtime
+        run: python -m pip install --disable-pip-version-check 'requests>=2.32'
+
+      - name: Validate updater
+        run: |
+          python -m py_compile enrich_crm_script.py
+          python enrich_crm_script.py --self-test
+
+      - name: Audit before applying
+        run: python enrich_crm_script.py --mode audit --max-updates 100
+
+      - name: Enforce audit safety gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('factura_enrichment_report.json').read_text())
+          counters = report.get('counters') or {}
+          assert report.get('status') == 'completed', report
+          assert report.get('staged_vendors') == 17, report
+          assert report.get('matched_vendors', 0) > 0, report
+          assert report.get('records_prepared', 0) <= 17, report
+          assert counters.get('ambiguous', 0) == 0, report
+          print(json.dumps({
+              'matched_vendors': report.get('matched_vendors'),
+              'records_prepared': report.get('records_prepared'),
+              'fields_prepared': counters.get('fields', 0),
+              'already_current': counters.get('already_current', 0),
+          }, indent=2))
+          PY
+
+      - name: Apply verified Vendor Contacts updates
         run: python enrich_crm_script.py --mode apply --max-updates 100
+
+      - name: Publish execution summary
+        if: always()
+        run: |
+          if [ -f factura_enrichment_report.json ]; then
+            echo '## FACTURA Vendor Enrichment' >> "$GITHUB_STEP_SUMMARY"
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          r = json.loads(Path('factura_enrichment_report.json').read_text())
+          a = r.get('apply_result') or {}
+          print(f"- Status: **{r.get('status')}**")
+          print(f"- Records scanned: **{r.get('records_scanned', 0)}**")
+          print(f"- Vendors matched: **{r.get('matched_vendors', 0)}**")
+          print(f"- Records submitted: **{a.get('submitted', 0)}**")
+          print(f"- Successful updates: **{a.get('success', 0)}**")
+          print(f"- Failed updates: **{a.get('failed', 0)}**")
+          PY
+          fi
+
       - name: Upload FACTURA audit package
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: factura-vendor-enrichment-audit
+          name: factura-vendor-enrichment-audit-${{ github.run_id }}
           path: |
             factura_enrichment_report.json
             factura_enrichment_audit.jsonl
