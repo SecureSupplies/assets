@@ -1,6 +1,10 @@
 from __future__ import annotations
+
 from typing import Iterable, List
+
 from .schemas import NormalizedRecord
+from .score_opportunities import days_until
+
 
 FAST_NOTICE_WORDS = ["rfq", "quote", "purchase order", "direct purchase", "emergency", "urgent", "small purchase", "simplified acquisition", "delivery needed", "spot buy"]
 FORMAL_NOTICE_WORDS = ["rfi", "rfp", "sources sought", "presolicitation", "solicitation", "tender", "bid", "sole source"]
@@ -11,25 +15,39 @@ DIRECT_PO_BUYER_WORDS = ["public works", "city fleet", "county fleet", "school",
 
 def route_record(record: NormalizedRecord) -> NormalizedRecord:
     text = f" {record.title} {record.description} {record.notice_type} {record.source_type} {record.agency_name} {record.buying_office} ".lower()
-    if record.source_type.lower() == "auction" or any(w in text for w in AUCTION_WORDS):
+    expired = (days_until(record.due_date) or 0) < 0 if record.due_date else False
+
+    if record.source_type.lower() == "auction" or any(word in text for word in AUCTION_WORDS):
         record.recommended_module = "GOV AUCTIONS"
-        if record.fast_purchase_score >= 80:
+        if expired:
+            record.recommended_action = "Auction Closed / Pass"
+        elif record.fast_purchase_score >= 80:
             record.recommended_action = "Evaluate Asset Buy"
         return record
-    if any(w in text for w in AWARD_WORDS) or record.source_type.lower() == "award":
+
+    if any(word in text for word in AWARD_WORDS) or record.source_type.lower() == "award":
         record.recommended_module = "GOV AWARDS"
         record.recommended_action = "Incumbent / Renewal Watch"
         return record
-    if record.fast_purchase_score >= 55 or record.direct_po_eligible or any(w in text for w in FAST_NOTICE_WORDS):
+
+    if expired:
+        record.recommended_module = "GOV WATCHLIST"
+        record.recommended_action = "Expired - Renewal / Rebid Watch"
+        return record
+
+    if record.fast_purchase_score >= 55 or record.direct_po_eligible or any(word in text for word in FAST_NOTICE_WORDS):
         record.recommended_module = "GOV FAST PURCHASE POSTS"
         return record
-    if any(w in text for w in FORMAL_NOTICE_WORDS):
+
+    if any(word in text for word in FORMAL_NOTICE_WORDS):
         record.recommended_module = "LEADS GOV"
         return record
-    if any(w in text for w in DIRECT_PO_BUYER_WORDS):
+
+    if any(word in text for word in DIRECT_PO_BUYER_WORDS):
         record.recommended_module = "GOV DIRECT PO"
         record.recommended_action = "Call Buyer / Vendor Registration"
         return record
+
     record.recommended_module = "LEADS GOV" if record.priority_score >= 70 else "GOV WATCHLIST"
     return record
 
@@ -58,6 +76,6 @@ def sales_output(record: NormalizedRecord) -> dict:
         "product_fit_explanation": f"Matched {product} via {', '.join(record.product_keywords_matched[:8]) or 'source category/code'}.",
         "pricing_basis_needed": pricing_basis,
         "compliance_requirement": "Validate vendor registration, insurance, SDS/product documentation, and delivery-site requirements.",
-        "bid_no_bid_recommendation": "Bid/quote" if record.priority_label in {"A1", "A2", "B1"} else "Watch/no-bid unless easy quote",
+        "bid_no_bid_recommendation": "Bid/quote" if record.priority_label in {"A1", "A2", "B1"} and not expired else "Watch/no-bid unless easy quote",
         "next_action_deadline": record.due_date or "Same day for A1/A2"
     }
