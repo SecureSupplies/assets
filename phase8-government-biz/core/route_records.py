@@ -59,6 +59,7 @@ def route_records(records: Iterable[NormalizedRecord]) -> List[NormalizedRecord]
 def sales_output(record: NormalizedRecord) -> dict:
     product = record.product_category or "Secure Supplies product lane"
     buyer = record.agency_name or record.buying_office or "Government buyer"
+    expired = (days_until(record.due_date) or 0) < 0 if record.due_date else False
     pricing_basis = "Rack/index + freight + margin target" if "fuel" in product.lower() or "diesel" in product.lower() else "Supplier quote + freight + target gross margin"
     script = f"We can support {product} with delivered supply, logistics coordination, and recurring service. Who handles same-day quote approval, purchase orders, vendor registration, and delivery scheduling?"
     if "tank" in " ".join(record.fast_lane_tags).lower() or "tank" in product.lower():
@@ -77,5 +78,5 @@ def sales_output(record: NormalizedRecord) -> dict:
         "pricing_basis_needed": pricing_basis,
         "compliance_requirement": "Validate vendor registration, insurance, SDS/product documentation, and delivery-site requirements.",
         "bid_no_bid_recommendation": "Bid/quote" if record.priority_label in {"A1", "A2", "B1"} and not expired else "Watch/no-bid unless easy quote",
-        "next_action_deadline": record.due_date or "Same day for A1/A2"
+        "next_action_deadline": record.due_date or "Same day for A1/A2",
     }
