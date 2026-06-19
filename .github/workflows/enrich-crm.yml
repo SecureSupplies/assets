@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '17 */3 * * *'
+    - cron: '23 19 * * *'
   push:
     branches:
       - master
@@ -115,7 +116,7 @@ jobs:
           applied = report.get('apply_result') or {}
           stable = {
               'workflow_commit': os.getenv('FACTURA_COMMIT'),
-              'cadence_utc': 'minute 17 every 3 hours',
+              'cadence_utc': 'every 3 hours at minute 17 plus daily at 19:23',
               'status': report.get('status', 'report_missing'),
               'mode': report.get('mode'),
               'records_scanned': report.get('records_scanned', 0),
