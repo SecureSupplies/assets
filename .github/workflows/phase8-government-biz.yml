@@ -7,10 +7,12 @@ on:
     paths:
       - "phase8-government-biz/**"
       - ".github/workflows/phase8-government-biz.yml"
+      - ".github/workflows/phase8-zoho-operations.yml"
   pull_request:
     paths:
       - "phase8-government-biz/**"
       - ".github/workflows/phase8-government-biz.yml"
+      - ".github/workflows/phase8-zoho-operations.yml"
   workflow_dispatch:
 
 permissions:
