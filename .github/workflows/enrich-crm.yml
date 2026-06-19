@@ -142,14 +142,38 @@ jobs:
           status_path.write_text(json.dumps(status, indent=2) + '\n')
           PY
 
+      - name: Write daily scheduler heartbeat
+        if: ${{ always() && github.event_name == 'schedule' && github.event.schedule == '23 19 * * *' }}
+        env:
+          FACTURA_RUN_ID: ${{ github.run_id }}
+          FACTURA_COMMIT: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          heartbeat = {
+              'last_daily_trigger_utc': datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+              'workflow_run_id': os.getenv('FACTURA_RUN_ID'),
+              'workflow_commit': os.getenv('FACTURA_COMMIT'),
+              'purpose': 'Keep the daily manual-equivalent trigger active and auditable.'
+          }
+          Path('factura_scheduler_heartbeat.json').write_text(json.dumps(heartbeat, indent=2) + '\n')
+          PY
+
       - name: Persist operational status changes
         if: always()
         run: |
           git config user.name 'factura-enrichment-bot'
           git config user.email 'actions@users.noreply.github.com'
           git add factura_execution_status.json
+          if [ -f factura_scheduler_heartbeat.json ]; then
+            git add factura_scheduler_heartbeat.json
+          fi
           if ! git diff --cached --quiet; then
-            git commit -m 'Record FACTURA enrichment state change'
+            git commit -m 'Record FACTURA enrichment state and scheduler heartbeat'
             git pull --rebase origin master
             git push origin HEAD:master
           fi
@@ -164,5 +188,6 @@ jobs:
             factura_enrichment_audit.jsonl
             factura_zoho_schema.json
             factura_execution_status.json
+            factura_scheduler_heartbeat.json
           if-no-files-found: warn
           retention-days: 30
