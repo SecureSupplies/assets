@@ -1,5 +1,5 @@
 {
-  "workflow_commit": "3ba1597c045da2e81216501ba4c9d46a76bc95ee",
+  "workflow_commit": "0bfa4209007f28f1d36348baf2d3740cba62fbb5",
   "cadence_utc": "every 3 hours at minute 17 plus daily at 19:23",
   "status": "failed",
   "mode": "audit",
@@ -12,7 +12,7 @@
   "failed": 0,
   "counters": {},
   "error": "No Zoho OAuth credential configured",
-  "state_changed_at": "2026-06-19T20:02:48+00:00",
-  "workflow_run_id": "27845999006",
+  "state_changed_at": "2026-06-19T21:42:34+00:00",
+  "workflow_run_id": "27849724167",
   "event": "schedule"
 }
