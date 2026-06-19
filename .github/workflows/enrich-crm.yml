@@ -114,6 +114,7 @@ jobs:
           previous = json.loads(status_path.read_text()) if status_path.exists() else {}
           applied = report.get('apply_result') or {}
           stable = {
+              'workflow_commit': os.getenv('FACTURA_COMMIT'),
               'cadence_utc': 'minute 17 every 3 hours',
               'status': report.get('status', 'report_missing'),
               'mode': report.get('mode'),
@@ -136,7 +137,6 @@ jobs:
                   'state_changed_at': datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
                   'workflow_run_id': os.getenv('FACTURA_RUN_ID'),
                   'event': os.getenv('FACTURA_EVENT'),
-                  'commit': os.getenv('FACTURA_COMMIT'),
               }
           status_path.write_text(json.dumps(status, indent=2) + '\n')
           PY
