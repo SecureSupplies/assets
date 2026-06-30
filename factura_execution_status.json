@@ -1,5 +1,5 @@
 {
-  "workflow_commit": "9d2ee1a60def8637791a724edb94871c8b943103",
+  "workflow_commit": "4d372c768d34882ac3b0367072e32d70c3ff896c",
   "cadence_utc": "every 3 hours at minute 17 plus daily at 19:23",
   "status": "failed",
   "mode": "audit",
@@ -12,7 +12,7 @@
   "failed": 0,
   "counters": {},
   "error": "OAuth refresh returned no token",
-  "state_changed_at": "2026-06-30T18:56:32+00:00",
-  "workflow_run_id": "28468621185",
+  "state_changed_at": "2026-06-30T20:07:46+00:00",
+  "workflow_run_id": "28472577123",
   "event": "schedule"
 }
