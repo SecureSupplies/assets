@@ -1,5 +1,5 @@
 {
-  "workflow_commit": "b73b8523f36c5b890cfcfd90269580b9c8cb0bcd",
+  "workflow_commit": "69a78e22b6f728483e86abffa67a5df6fc0fc554",
   "cadence_utc": "every 3 hours at minute 17 plus daily at 19:23",
   "status": "failed",
   "mode": "audit",
@@ -11,8 +11,8 @@
   "successful": 0,
   "failed": 0,
   "counters": {},
-  "error": "OAuth refresh failed: zoho_error=invalid_code desc=None http=200 rt_len=70 rt_1000=True cid_len=35 cid_1000=True cs_len=42 host=https://accounts.zoho.com",
-  "state_changed_at": "2026-08-09T19:25:11+00:00",
-  "workflow_run_id": "31331572692",
+  "error": "GET Vendors HTTP 400: {\"code\":\"DISCRETE_PAGINATION_LIMIT_EXCEEDED\",\"details\":{\"limit\":2000},\"message\":\"You can only get the first 2000 records without using page_token param\",\"status\":\"error\"}\n",
+  "state_changed_at": "2026-08-09T19:37:10+00:00",
+  "workflow_run_id": "31332096659",
   "event": "workflow_dispatch"
 }
