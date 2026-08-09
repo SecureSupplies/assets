@@ -55,9 +55,9 @@ class Z:
  def mods(self):return self.call("GET","settings/modules").get("modules",[])
  def fields(self,m):return self.call("GET","settings/fields",params={"module":m}).get("fields",[])
  def records(self,m,fs):
-  o=[];pg=1;fs=list(dict.fromkeys(x for x in fs if x))[:50]
+  o=[];pg=1;tok=None;fs=list(dict.fromkeys(x for x in fs if x))[:50]
   while 1:
-   x=self.call("GET",m,params={"page":pg,"per_page":200,"fields":",".join(fs),"sort_by":"id","sort_order":"asc"});b=x.get("data",[]);o+=b
+   x=self.call("GET",m,params={**({"page_token":tok} if tok else {"page":pg}),"per_page":200,"fields":",".join(fs),"sort_by":"id","sort_order":"asc"});b=x.get("data",[]);o+=b;tok=(x.get("info") or {}).get("next_page_token")
    if not b or not (x.get("info") or {}).get("more_records"):return o
    pg+=1
  def update(self,m,rows):
