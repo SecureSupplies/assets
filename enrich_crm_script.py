@@ -40,7 +40,7 @@ class Z:
   r=self.s.post(self.acc+"/oauth/v2/token",data={"refresh_token":self.rt,"client_id":self.cid,"client_secret":self.cs,"grant_type":"refresh_token"},timeout=30)
   if r.status_code>=400:raise X(f"OAuth refresh HTTP {r.status_code}: {r.text[:400]}")
   x=r.json();self.api=(x.get("api_domain") or self.api).rstrip("/")
-  if not x.get("access_token"):raise X("OAuth refresh returned no token")
+  if not x.get("access_token"):raise X("OAuth refresh failed: zoho_error={} desc={} http={} rt_len={} rt_1000={} cid_len={} cid_1000={} cs_len={} host={}".format(x.get("error"),x.get("error_description"),r.status_code,len(self.rt),self.rt.startswith("1000."),len(self.cid),self.cid.startswith("1000."),len(self.cs),self.acc))
   return str(x["access_token"])
  def call(self,m,p,params=None,body=None):
   u=f"{self.api}/crm/v8/{p.lstrip('/')}";red=False
