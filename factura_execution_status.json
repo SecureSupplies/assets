@@ -1,18 +1,22 @@
 {
-  "workflow_commit": "69a78e22b6f728483e86abffa67a5df6fc0fc554",
+  "workflow_commit": "f8af67dde3c8bb692a0b0b72ccace297d3d70a1a",
   "cadence_utc": "every 3 hours at minute 17 plus daily at 19:23",
-  "status": "failed",
-  "mode": "audit",
-  "records_scanned": 0,
-  "staged_vendors": 0,
-  "matched_vendors": 0,
-  "records_prepared": 0,
-  "submitted": 0,
-  "successful": 0,
+  "status": "completed",
+  "mode": "apply",
+  "records_scanned": 3730,
+  "staged_vendors": 17,
+  "matched_vendors": 9,
+  "records_prepared": 10,
+  "submitted": 10,
+  "successful": 10,
   "failed": 0,
-  "counters": {},
-  "error": "GET Vendors HTTP 400: {\"code\":\"DISCRETE_PAGINATION_LIMIT_EXCEEDED\",\"details\":{\"limit\":2000},\"message\":\"You can only get the first 2000 records without using page_token param\",\"status\":\"error\"}\n",
-  "state_changed_at": "2026-08-09T19:37:10+00:00",
-  "workflow_run_id": "31332096659",
-  "event": "workflow_dispatch"
+  "counters": {
+    "already_current": 13,
+    "records": 10,
+    "fields": 67
+  },
+  "error": "",
+  "state_changed_at": "2026-08-09T19:48:36+00:00",
+  "workflow_run_id": "31332583916",
+  "event": "push"
 }
