@@ -72,10 +72,11 @@ def module(ms,k):
  for m in ms:
   t=mt(m);s=0
   if k=="v":s=100 if t&{"vendorcontacts","vendorcontact"} else 90 if any("vendor" in x and "contact" in x for x in t) else 65 if t&{"vendors","vendor"} else 0
+  elif k=="a":s=100 if t&{"accounts","account"} else 0
   else:s=100 if t&{"routes","route"} else 80 if any("route" in x for x in t) else 0
   if s:z.append((s,m))
  return max(z,key=lambda x:x[0])[1] if z else None
-FA={"vn":["Vendor Name","Vendor Contact Name","Company Name","Account Name","Name","Vendor"],"p":["000 Products","000 Product","Primary Product","Main Product","Products","Product"],"st":["Street Address","Physical Address","Vendor Address","Mailing Street","Street","Address"],"a2":["Address Line 2","Address 2","Suite","Unit","Mailing Street 2"],"ci":["City","Mailing City","Vendor City"],"sa":["State","Mailing State","State Province","Vendor State"],"zi":["ZIP Code","Zip","Postal Code","Mailing Zip","Mailing Postal Code"],"co":["Country","Mailing Country","Vendor Country"],"ro":["Routes","Route","Assigned Route","Route Number","Route Name"],"ph":["Main Business Phone","Business Phone","Phone","Vendor Phone","Main Phone"],"fa":["Fax","Fax Number"],"em":["Business Email","Vendor Email","Email","Sales Email"],"we":["Official Website","Website","Vendor Website","URL"],"cn":["Contact Name","Primary Contact","Public Contact Name"],"ct":["Contact Title","Title","Job Title"],"li":["LinkedIn","LinkedIn Company Page"],"so":["Enrichment Source","Source URL","Source","Research Source"],"ve":["Verification Date","Verified At","Last Verified","Enriched Date"]}
+FA={"vn":["Vendor Name","Vendor Contact Name","Company Name","Account Name","Name","Vendor"],"p":["000 Products","000 Product","Primary Product","Main Product","Products","Product"],"st":["Street Address","Physical Address","Vendor Address","Mailing Street","Street","Address","Billing Street"],"a2":["Address Line 2","Address 2","Suite","Unit","Mailing Street 2"],"ci":["City","Mailing City","Vendor City","Billing City"],"sa":["State","Mailing State","State Province","Vendor State","Billing State"],"zi":["ZIP Code","Zip","Postal Code","Mailing Zip","Mailing Postal Code","Billing Code"],"co":["Country","Mailing Country","Vendor Country","Billing Country"],"ro":["Routes","Route","Assigned Route","Route Number","Route Name"],"ph":["Main Business Phone","Business Phone","Phone","Vendor Phone","Main Phone"],"fa":["Fax","Fax Number"],"em":["Business Email","Vendor Email","Email","Sales Email"],"we":["Official Website","Website","Vendor Website","URL"],"cn":["Contact Name","Primary Contact","Public Contact Name"],"ct":["Contact Title","Title","Job Title"],"li":["LinkedIn","LinkedIn Company Page"],"so":["Enrichment Source","Source URL","Source","Research Source"],"ve":["Verification Date","Verified At","Last Verified","Enriched Date"]}
 LM={"000 Products":"p","Street Address":"st","Address Line 2":"a2","City":"ci","State":"sa","ZIP":"zi","Country":"co","Routes":"ro","Phone":"ph","Fax":"fa","Email":"em","Website":"we","Contact Name":"cn","Contact Title":"ct","LinkedIn":"li","Source":"so","Verification Date":"ve"}
 def ft(f):return {nt(f.get(k)) for k in ("field_label","api_name","display_label") if f.get(k)}
 def wr(f):
@@ -167,18 +168,20 @@ def match(r,na,e,f):
   ci=cl(r.get(f["ci"]["api_name"])) if f.get("ci") else "";sa=cl(r.get(f["sa"]["api_name"])) if f.get("sa") else ""
   if ex not in ds and not(nt(ci)==nt(e["d"]["City"]) and nt(sa)==nt(e["d"]["State"])):return False
  return True
-def run(mode,limit):
- z=Z();ms=z.mods();vm=module(ms,"v");rm=module(ms,"r")
- if not vm:raise X("Vendor Contacts module not found")
- va=str(vm["api_name"]);ra=str(rm["api_name"]) if rm else "";fs=z.fields(va);f={k:fmap(fs,k) for k in FA}
- if not f["vn"]:raise X("Vendor name field not found")
- na=str(f["vn"]["api_name"]);rec=z.records(va,["id",na]+[str(x["api_name"]) for x in f.values() if x]);ix=I(z);rows=[];au=[];c=Counter();ma=set()
+FIELDS=["000 Products","Street Address","Address Line 2","City","State","ZIP","Country","Routes","Phone","Fax","Email","Website","Contact Name","Contact Title","LinkedIn","Source","Verification Date"]
+def emode(n,d):
+ v=str(os.getenv("FACTURA_"+n,d) or d).strip().lower()
+ return v if v in {"off","audit","apply"} else d
+def scan(z,ix,api,ra,limit):
+ fs=z.fields(api);f={k:fmap(fs,k) for k in FA}
+ if not f["vn"]:raise X(api+": name field not found")
+ na=str(f["vn"]["api_name"]);rec=z.records(api,["id",na]+[str(x["api_name"]) for x in f.values() if x]);rows=[];au=[];c=Counter();ma=set()
  for r in rec:
   q=[e for e in E if match(r,na,e,f)]
   if not q:continue
-  if len(q)!=1:au.append({"status":"ambiguous","record_id":r.get("id"),"matches":[x["n"] for x in q]});c["ambiguous"]+=1;continue
+  if len(q)!=1:au.append({"module":api,"status":"ambiguous","record_id":r.get("id"),"matches":[x["n"] for x in q]});c["ambiguous"]+=1;continue
   e=q[0];ma.add(e["n"]);u={"id":r["id"]};ch=[];sk=[]
-  for k in ["000 Products","Street Address","Address Line 2","City","State","ZIP","Country","Routes","Phone","Fax","Email","Website","Contact Name","Contact Title","LinkedIn","Source","Verification Date"]:
+  for k in FIELDS:
    if k not in e["s"]:continue
    v=sv(k,e["d"].get(k))
    if v is None:continue
@@ -191,23 +194,39 @@ def run(mode,limit):
    elif "multiselectpicklist" in d and not isinstance(v,list):cv=[v]
    elif k=="Source" and "picklist" in d:cv=None;why="source picklist unsafe"
    if cv is None:sk.append({"field":k,"reason":why});continue
-   api=str(ff["api_name"])
-   if eq(r.get(api),cv):c["already_current"]+=1;continue
-   u[api]=cv;ch.append({"field":k,"api":api,"old":r.get(api),"new":cv,"source":e["d"].get("Source"),"conversion":why})
+   ap=str(ff["api_name"])
+   if eq(r.get(ap),cv):c["already_current"]+=1;continue
+   u[ap]=cv;ch.append({"field":k,"api":ap,"old":r.get(ap),"new":cv,"source":e["d"].get("Source"),"conversion":why})
   name=tv(r.get(na))[0] if tv(r.get(na)) else ""
-  if len(u)==1:au.append({"status":"no changes","record_id":r["id"],"record_name":name,"canonical":e["n"],"skips":sk});c["no_changes"]+=1;continue
+  if len(u)==1:au.append({"module":api,"status":"no changes","record_id":r["id"],"record_name":name,"canonical":e["n"],"skips":sk});c["no_changes"]+=1;continue
   if limit and len(rows)>=limit:c["limit"]+=1;continue
-  rows.append(u);au.append({"status":"prepared","record_id":r["id"],"record_name":name,"canonical":e["n"],"changes":ch,"skips":sk});c["records"]+=1;c["fields"]+=len(ch)
- res={"submitted":0,"success":0,"failed":0,"details":[]}
- if mode=="apply" and rows:res=z.update(va,rows)
+  rows.append(u);au.append({"module":api,"status":"prepared","record_id":r["id"],"record_name":name,"canonical":e["n"],"changes":ch,"skips":sk});c["records"]+=1;c["fields"]+=len(ch)
+ return {"api":api,"fields":f,"scanned":len(rec),"rows":rows,"audit":au,"counters":c,"matched":ma}
+def run(mode,limit):
+ z=Z();ms=z.mods();vm=module(ms,"v");rm=module(ms,"r");am=module(ms,"a")
+ if not vm:raise X("Vendor Contacts module not found")
+ va=str(vm["api_name"]);ra=str(rm["api_name"]) if rm else "";ix=I(z);acc=emode("ACCOUNTS","audit");plan=[(va,"apply")]
+ if acc!="off" and am and str(am["api_name"])!=va:plan.append((str(am["api_name"]),acc))
+ res={"submitted":0,"success":0,"failed":0,"details":[]};au=[];mods={};sch={};tot=Counter();base=None
+ for api,pm in plan:
+  s=scan(z,ix,api,ra,limit);au+=s["audit"];sch[api]={k:(v and {"label":v.get("field_label"),"api":v.get("api_name"),"type":v.get("data_type")}) for k,v in s["fields"].items()}
+  ar={"submitted":0,"success":0,"failed":0,"details":[]}
+  if mode=="apply" and pm=="apply" and s["rows"]:ar=z.update(api,s["rows"])
+  res["submitted"]+=ar["submitted"];res["success"]+=ar["success"];res["failed"]+=ar["failed"];res["details"]+=ar["details"]
+  tot["records_scanned"]+=s["scanned"];tot["records_prepared"]+=len(s["rows"])
+  mods[api]={"write_mode":pm,"records_scanned":s["scanned"],"matched_vendors":len(s["matched"]),"records_prepared":len(s["rows"]),"counters":dict(s["counters"]),"apply_result":{"submitted":ar["submitted"],"success":ar["success"],"failed":ar["failed"]},"unmatched":sorted({x["n"] for x in E}-s["matched"])}
+  if base is None:base=s
  with A.open("w",encoding="utf-8") as h:
   for x in au:h.write(json.dumps(x,ensure_ascii=False,default=str)+"\n")
- dump(S,{"vendor_module":vm,"routes_module":rm,"fields":{k:(v and {"label":v.get("field_label"),"api":v.get("api_name"),"type":v.get("data_type")}) for k,v in f.items()}})
- return {"generated_at":now(),"mode":mode,"portal":pcheck(),"vendor_module":va,"routes_module":ra or None,"records_scanned":len(rec),"staged_vendors":len(E),"matched_vendors":len(ma),"unmatched":sorted({x["n"] for x in E}-ma),"records_prepared":len(rows),"counters":dict(c),"apply_result":res}
+ dump(S,{"vendor_module":vm,"routes_module":rm,"accounts_module":am,"fields":sch.get(va),"modules":sch})
+ return {"generated_at":now(),"mode":mode,"portal":pcheck(),"vendor_module":va,"routes_module":ra or None,"accounts_module":(str(am["api_name"]) if am else None),"accounts_mode":acc,"records_scanned":base["scanned"],"staged_vendors":len(E),"matched_vendors":len(base["matched"]),"unmatched":sorted({x["n"] for x in E}-base["matched"]),"records_prepared":len(base["rows"]),"counters":dict(base["counters"]),"apply_result":res,"modules":mods,"totals":{"records_scanned":tot["records_scanned"],"records_prepared":tot["records_prepared"],"submitted":res["submitted"],"success":res["success"],"failed":res["failed"]}}
 def test():
  assert ck("J.T. Horn Oil Co., Inc.")==ck("JT Horn Oil")
  assert dom("sales@suncoastresources.com")=="suncoastresources.com"
  assert len(E)==17 and sum(x["d"]["000 Products"]=="Diesel Fuel" for x in E)==15
+ assert module([{"api_name":"Accounts","plural_label":"Accounts"}],"a")["api_name"]=="Accounts"
+ assert module([{"api_name":"Vendors","plural_label":"Vendors"}],"a") is None
+ assert len(FIELDS)==17 and emode("UNSET_MODE_XYZ","audit")=="audit"
  print("FACTURA verified enrichment self-test passed")
 def main():
  p=argparse.ArgumentParser();p.add_argument("--mode",choices=["audit","apply"],default=os.getenv("FACTURA_ENRICH_MODE","audit"));p.add_argument("--max-updates",type=int,default=100);p.add_argument("--self-test",action="store_true");a=p.parse_args()
