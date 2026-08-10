@@ -33,7 +33,6 @@ jobs:
       ZOHO_REFRESH_TOKEN_VALUE: ${{ secrets.ZOHO_REFRESH_TOKEN_VALUE }}
       ZOHO_ACCOUNTS_DOMAIN: ${{ vars.ZOHO_ACCOUNTS_DOMAIN || 'https://accounts.zoho.com' }}
       ZOHO_API_DOMAIN: ${{ vars.ZOHO_API_DOMAIN || 'https://www.zohoapis.com' }}
-      FACTURA_ACCOUNTS: ${{ vars.FACTURA_ACCOUNTS || 'audit' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -67,11 +66,6 @@ jobs:
           assert report.get('matched_vendors', 0) > 0, report
           assert report.get('records_prepared', 0) <= 17, report
           assert counters.get('ambiguous', 0) == 0, report
-          modules = report.get('modules') or {}
-          for name, detail in modules.items():
-              assert detail.get('records_prepared', 0) <= 17, (name, detail)
-              if detail.get('write_mode') == 'apply':
-                  assert (detail.get('counters') or {}).get('ambiguous', 0) == 0, (name, detail)
           print(json.dumps({
               'matched_vendors': report.get('matched_vendors'),
               'records_prepared': report.get('records_prepared'),
@@ -99,8 +93,6 @@ jobs:
           print(f"- Records submitted: **{a.get('submitted', 0)}**")
           print(f"- Successful updates: **{a.get('success', 0)}**")
           print(f"- Failed updates: **{a.get('failed', 0)}**")
-          for name, detail in (r.get('modules') or {}).items():
-              print(f"- {name} ({detail.get('write_mode')}): scanned **{detail.get('records_scanned', 0)}**, matched **{detail.get('matched_vendors', 0)}**, prepared **{detail.get('records_prepared', 0)}**")
           PY
           fi
 
