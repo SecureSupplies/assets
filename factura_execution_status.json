@@ -1,21 +1,18 @@
 {
-  "workflow_commit": "dc1569cb97d2d555e8001236f157fe3a4f428bbb",
+  "workflow_commit": "bc360f56b68cde174b2367bf7d3a93d18e98ff42",
   "cadence_utc": "every 3 hours at minute 17 plus daily at 19:23",
-  "status": "completed",
-  "mode": "apply",
-  "records_scanned": 3730,
-  "staged_vendors": 17,
-  "matched_vendors": 9,
+  "status": "failed",
+  "mode": "audit",
+  "records_scanned": 0,
+  "staged_vendors": 0,
+  "matched_vendors": 0,
   "records_prepared": 0,
   "submitted": 0,
   "successful": 0,
   "failed": 0,
-  "counters": {
-    "already_current": 80,
-    "no_changes": 10
-  },
-  "error": "",
-  "state_changed_at": "2026-08-10T08:04:21+00:00",
-  "workflow_run_id": "31368395494",
-  "event": "schedule"
+  "counters": {},
+  "error": "GET Accounts HTTP 400: {\"code\":\"PAGINATION_LIMIT_EXCEEDED\",\"details\":{\"param_name\":\"page_token\"},\"message\":\"You can only get upto 100000 records using page_token param\",\"status\":\"error\"}\n",
+  "state_changed_at": "2026-08-10T09:02:30+00:00",
+  "workflow_run_id": "31372515878",
+  "event": "push"
 }
