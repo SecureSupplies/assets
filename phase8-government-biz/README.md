@@ -1,12 +1,8 @@
 # Phase 8 Government Biz
 
-Phase 8 Government Biz is Secure Supplies' government sales-intelligence and opportunity-generation package. It is built to find public-sector money, classify product fit, score urgency and margin potential, route opportunities to the correct CRM queue, preserve source auditability, create CRM tasks, and email high-value order leads to `fuels@securesupplies.us`.
+Phase 8 Government Biz is Secure Supplies' government sales-intelligence and opportunity-generation package. It ingests public-sector opportunity, award, auction, pricing, weather, disaster, and direct-purchase data; classifies product fit; scores urgency and commercial value; routes records to Zoho CRM; preserves source auditability; creates linked tasks; and can send controlled high-value alerts.
 
-## What it does
-
-The pipeline pulls government opportunity, award, auction, pricing, disaster, weather, and direct-PO seed data. It normalizes every record into a common schema, classifies product lanes, deduplicates, scores, routes, and writes dry-run outputs or production CRM records.
-
-Top commercial lanes:
+## Commercial lanes
 
 1. Diesel + tank rental + monitoring + auto-refill
 2. DEF route service attached to diesel buyers
@@ -17,11 +13,11 @@ Top commercial lanes:
 7. Port and ferry marine diesel / MGO
 8. Surplus tank/generator/fuel asset acquisition
 9. CNG / LNG / RNG fleet and infrastructure projects
-10. Fertilizer / ammonia / urea / NPK seasonal demand
+10. Fertilizer / ammonia / urea / UAN / NPK demand
 
-## CRM modules
+## Zoho CRM structure
 
-The Zoho deployment plan creates a `Phase 8 Government Biz` section/tab group and these modules in order:
+The existing Zoho menu/tab group is `Phase 8 Government Biz`. It must contain these custom-module shells in order:
 
 1. GOV FAST PURCHASE POSTS
 2. LEADS GOV
@@ -39,7 +35,11 @@ The Zoho deployment plan creates a `Phase 8 Government Biz` section/tab group an
 14. GOV SOURCE HEALTH
 15. GOV RAW DATA AUDIT
 
-`GOV FAST PURCHASE POSTS` is the top money queue. Score 85-100 routes to `Call Now`, 70-84 to `Quote Now`, 55-69 to `Procurement Review`, and sub-55 to watch/no-bid.
+`GOV FAST PURCHASE POSTS` is the top money queue. Scores 85-100 route to `Call Now`, 70-84 to `Quote Now`, 55-69 to `Procurement Review`, and lower scores to watch/no-bid handling. Expired notices are excluded from active call and quote queues.
+
+Zoho generates custom-module and custom-field API names. The deployment code reads those names from live metadata rather than deriving names from labels.
+
+See [`docs/ZOHO_MODULE_SHELL_CHECKLIST.md`](docs/ZOHO_MODULE_SHELL_CHECKLIST.md) for the exact module and primary-field labels.
 
 ## Install
 
@@ -47,50 +47,97 @@ The Zoho deployment plan creates a `Phase 8 Government Biz` section/tab group an
 cd phase8-government-biz
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Populate `.env` with Zoho OAuth, public API keys, and SMTP credentials. Do not commit `.env`.
+Populate `.env` through the approved secret-management process. Do not commit credentials.
 
-## Test mode
+## Isolated validation
 
 ```bash
-python -m pytest
-python run_pipeline.py --mode test --include-samples
+python -m compileall -q .
+python -m pytest -q
+python run_pipeline.py --mode test --limit-per-source 10
 ```
 
-Test mode creates:
+Test mode uses sample data only unless `--include-live-sources` is explicitly supplied. It does not write to Zoho and does not send notifications.
+
+Primary outputs include:
 
 - `out/phase8_normalized_records.csv`
 - `out/phase8_records.json`
 - `out/phase8_source_health.json`
+- `out/phase8_raw_audit.json`
 - `out/phase8_email_outcomes.json`
 - `out/phase8_crm_result.json`
+- `out/phase8_task_result.json`
+- `out/phase8_deployment_report.json`
 - `out/zoho_phase8_deployment_plan.json`
 
-Test mode does not write to Zoho and does not send emails.
+## Zoho module audit
 
-## Production mode
+The REST deployment layer can audit existing custom-module shells and create fields on shells that already exist. It does not fabricate module API names.
 
 ```bash
-PHASE8_DRY_RUN=false python run_pipeline.py --mode production --deploy-fields --limit-per-source 100
+python -m crm.deploy_phase8 --audit
+python -m crm.deploy_phase8 --apply --dry-run
+```
+
+Review:
+
+- `out/zoho_metadata_backup.json`
+- `out/zoho_phase8_deploy_result.json`
+- `out/zoho_phase8_field_map.json`
+
+The module audit must report `required_count: 15`, `found_count: 15`, and `missing_count: 0` before production record synchronization.
+
+## Controlled field deployment
+
+Live field creation requires every deployment gate to pass:
+
+```bash
+PHASE8_DRY_RUN=false \
+PHASE8_ENABLE_CRM_WRITES=true \
+PHASE8_DEPLOY_CONFIRMATION=DEPLOY_PHASE8 \
+python -m crm.deploy_phase8 --apply
+```
+
+The deployer:
+
+- backs up module and field metadata;
+- resolves actual Zoho API names;
+- creates missing fields in API-compliant batches;
+- adds the organization-wide `Phase8 External ID` used for idempotent upserts;
+- writes a post-deployment field map;
+- blocks record synchronization when required shells or fields are missing.
+
+## Production synchronization
+
+```bash
+PHASE8_DRY_RUN=false \
+PHASE8_ENABLE_CRM_WRITES=true \
+PHASE8_DEPLOY_CONFIRMATION=DEPLOY_PHASE8 \
+python run_pipeline.py --mode production --deploy-fields --limit-per-source 100
 ```
 
 Production mode:
 
-- Backs up Zoho module metadata.
-- Applies fields to existing Phase 8 module shells where accessible.
-- Pulls configured public sources.
-- Normalizes, classifies, scores, and dedupes.
-- Upserts records by external source ID.
-- Creates urgent CRM tasks.
-- Emails high-value order/lead alerts to `fuels@securesupplies.us` when SMTP is configured.
+- backs up Zoho metadata;
+- audits all 15 module shells;
+- applies missing fields when requested;
+- pulls configured public sources;
+- normalizes, classifies, scores, deduplicates, and routes records;
+- upserts in bounded batches using the external source identity;
+- preserves human-managed status, owner, notes, strategy, and action-plan fields;
+- creates linked urgent tasks only for newly inserted records;
+- writes `GOV SOURCE HEALTH` and `GOV RAW DATA AUDIT` records;
+- suppresses notifications unless the separate notification gate and SMTP configuration are complete.
 
-## Zoho limitation
+## Automation
 
-Zoho CRM API access in this package uses official REST endpoints for reading modules and creating custom fields. If the CRM edition/API scope does not expose custom module or tab-group creation, create the `Phase 8 Government Biz` tab group and module shells in Zoho UI, then run `crm/zoho_deploy.py --execute` to create fields and start sync.
+`.github/workflows/phase8-government-biz.yml` compiles the package, runs regression tests, executes the isolated pipeline dry-run, and uploads validation outputs. It never performs live CRM writes.
 
-## Scheduler
+`.github/workflows/phase8-zoho-operations.yml` provides protected manual operations for `audit`, `field-dry-run`, `field-apply`, `sync-dry-run`, and `sync-live`. Live operations require the `zoho-production` environment, configured Zoho OAuth secrets, and the exact `DEPLOY_PHASE8` confirmation.
 
-`scheduler.yaml` defines hourly urgent SAM.gov checks, daily full syncs, weather/disaster checks every two hours, and manual dry-run validation. The GitHub Actions workflow runs the same commands once the workflow is merged to the default branch and secrets are installed.
+`scheduler.yaml` defines the operating cadence for urgent checks, full synchronization, and disaster/weather monitoring. Production scheduling should call the controlled commands above from an environment that has the approved Zoho OAuth configuration.
