@@ -1,9 +1,9 @@
 {
-  "workflow_commit": "fc8094ace37687c5c714c62870d3ab8f73498d2f",
+  "workflow_commit": "a9508e5d5568dfa42ea50901633cebec719d60a0",
   "cadence_utc": "every 3 hours at minute 17 plus daily at 19:23",
   "status": "completed",
   "mode": "apply",
-  "records_scanned": 3778,
+  "records_scanned": 3806,
   "staged_vendors": 17,
   "matched_vendors": 8,
   "records_prepared": 0,
@@ -15,7 +15,7 @@
     "no_changes": 8
   },
   "error": "",
-  "state_changed_at": "2026-09-11T04:40:09+00:00",
-  "workflow_run_id": "34563008867",
+  "state_changed_at": "2026-09-11T11:21:02+00:00",
+  "workflow_run_id": "34593522967",
   "event": "schedule"
 }
