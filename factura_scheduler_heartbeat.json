@@ -1,6 +1,6 @@
 {
-  "last_daily_trigger_utc": "2026-11-15T23:25:42+00:00",
-  "workflow_run_id": "43774718344",
-  "workflow_commit": "084e83bd223f536d02145bf1941a357eb85c88d8",
+  "last_daily_trigger_utc": "2026-11-17T02:31:17+00:00",
+  "workflow_run_id": "44003565328",
+  "workflow_commit": "9588d168c5d76b4127ff200ca5fa3db8aeb13f2f",
   "purpose": "Keep the daily manual-equivalent trigger active and auditable."
 }
