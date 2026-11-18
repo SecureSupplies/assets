@@ -1,5 +1,5 @@
 {
-  "workflow_commit": "d04c0ccba8649ef60a5c39a9d84a32a566962cf1",
+  "workflow_commit": "343b1a8f5caa0852544378e80cb38e1dad05373e",
   "cadence_utc": "every 3 hours at minute 17 plus daily at 19:23",
   "status": "failed",
   "mode": "audit",
@@ -12,7 +12,7 @@
   "failed": 0,
   "counters": {},
   "error": "GET settings/modules HTTP 403: {\"code\":\"CRMPLUS_TRIAL_EXPIRED\",\"details\":{},\"message\":\"CRM plus trial expired\",\"status\":\"error\"}\n",
-  "state_changed_at": "2026-11-18T00:57:04+00:00",
-  "workflow_run_id": "44211947782",
+  "state_changed_at": "2026-11-18T01:42:58+00:00",
+  "workflow_run_id": "44217882806",
   "event": "schedule"
 }
